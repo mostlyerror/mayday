@@ -216,6 +216,8 @@ describe('website-checker', () => {
     });
 
     it('should detect timeout errors', async () => {
+      // Note: fetchWithRetry uses progressive timeouts (15s, 20s, 30s) with 3 retries
+      // This test validates the error classification, not timeout duration
       (global.fetch as jest.Mock).mockRejectedValue(new Error('The operation was aborted'));
 
       const result = await checkWebsite('https://example.com', mockPlaceId);
