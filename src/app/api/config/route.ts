@@ -30,6 +30,7 @@ export async function GET() {
     const config = await cachedConfigPromise;
     return NextResponse.json(config);
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+    console.error('Failed to load configuration file:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
