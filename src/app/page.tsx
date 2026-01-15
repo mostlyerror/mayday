@@ -19,6 +19,13 @@ interface Stats {
   totalBusinesses: number;
   byLeadType: Record<string, number>;
   hotLeads: number;
+  apiUsage?: {
+    today: { calls: number; cost: number };
+    thisMonth: { calls: number; cost: number };
+    total: { calls: number; cost: number };
+    monthlyBudget: number;
+    remainingBudget: number;
+  };
 }
 
 interface Config {
