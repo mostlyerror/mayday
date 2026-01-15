@@ -18,6 +18,13 @@ interface Stats {
   totalBusinesses: number;
   byLeadType: Record<string, number>;
   hotLeads: number;
+  apiUsage?: {
+    today: { calls: number; cost: number };
+    thisMonth: { calls: number; cost: number };
+    total: { calls: number; cost: number };
+    monthlyBudget: number;
+    remainingBudget: number;
+  };
 }
 
 interface Config {
@@ -348,13 +355,13 @@ export default function Home() {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Used This Month:</span>
                     <span className="font-medium text-gray-900">
-                      ${scanProgress ? ((scanProgress.apiCallsUsed * 0.032) + (scanProgress.apiCallsUsed * 0.017)).toFixed(2) : '0.00'}
+                      ${stats?.apiUsage?.thisMonth.cost.toFixed(2) || '0.00'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Remaining:</span>
                     <span className="font-medium text-green-700">
-                      ${scanProgress ? (config.monthly_budget_usd - ((scanProgress.apiCallsUsed * 0.032) + (scanProgress.apiCallsUsed * 0.017))).toFixed(2) : config.monthly_budget_usd}
+                      ${stats?.apiUsage?.remainingBudget.toFixed(2) || config.monthly_budget_usd.toFixed(2)}
                     </span>
                   </div>
                   <div className="mt-3 pt-3 border-t border-green-200">
