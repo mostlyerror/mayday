@@ -1,0 +1,10 @@
+{
+  "center": {
+    "lat": 29.7604,
+    "lng": -95.3698,
+    "label": "Houston"
+  },
+  "radius_miles": 10,
+  "blocklist_path": "data/chain-blocklist.txt",
+  "monthly_budget_usd": 200
+}

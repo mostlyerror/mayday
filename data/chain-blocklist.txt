@@ -1,0 +1,179 @@
+# Chain restaurants and businesses to exclude from lead generation
+# Add one name per line (case-insensitive matching)
+
+# Fast Food
+McDonald's
+Burger King
+Wendy's
+Taco Bell
+KFC
+Chick-fil-A
+Popeyes
+Sonic Drive-In
+Jack in the Box
+Whataburger
+Five Guys
+In-N-Out
+Shake Shack
+Culver's
+Wingstop
+Buffalo Wild Wings
+Zaxby's
+
+# Pizza Chains
+Domino's
+Pizza Hut
+Papa John's
+Little Caesars
+Papa Murphy's
+Marco's Pizza
+
+# Coffee
+Starbucks
+Dunkin'
+Dunkin' Donuts
+Peet's Coffee
+Dutch Bros
+
+# Casual Dining
+Applebee's
+Chili's
+TGI Friday's
+Olive Garden
+Red Lobster
+Outback Steakhouse
+LongHorn Steakhouse
+Texas Roadhouse
+Cracker Barrel
+Denny's
+IHOP
+Waffle House
+Perkins
+Bob Evans
+Golden Corral
+Red Robin
+BJ's Restaurant
+Cheesecake Factory
+P.F. Chang's
+Benihana
+
+# Fast Casual
+Chipotle
+Panera Bread
+Qdoba
+Moe's Southwest Grill
+Noodles & Company
+Panda Express
+Raising Cane's
+Firehouse Subs
+Jersey Mike's
+Jimmy John's
+Subway
+Potbelly
+McAlister's Deli
+Jason's Deli
+Which Wich
+
+# Retail
+Walmart
+Target
+Costco
+Sam's Club
+Home Depot
+Lowe's
+Best Buy
+Walgreens
+CVS
+Rite Aid
+Dollar General
+Dollar Tree
+Family Dollar
+AutoZone
+O'Reilly Auto Parts
+Advance Auto Parts
+PetSmart
+Petco
+Bed Bath & Beyond
+Michaels
+Hobby Lobby
+JOANN
+Office Depot
+Staples
+
+# Banks
+Chase
+Bank of America
+Wells Fargo
+Citibank
+US Bank
+PNC Bank
+Capital One
+TD Bank
+Regions Bank
+SunTrust
+BB&T
+Fifth Third Bank
+
+# Hotels
+Marriott
+Hilton
+Holiday Inn
+Hampton Inn
+Hyatt
+Best Western
+Motel 6
+Super 8
+Days Inn
+La Quinta
+Comfort Inn
+Quality Inn
+Courtyard
+Residence Inn
+Fairfield Inn
+
+# Gas Stations / Convenience
+Shell
+Exxon
+Mobil
+Chevron
+BP
+Texaco
+76
+Circle K
+7-Eleven
+Speedway
+RaceTrac
+QuikTrip
+Wawa
+Sheetz
+Casey's
+
+# Fitness
+Planet Fitness
+LA Fitness
+24 Hour Fitness
+Gold's Gym
+Anytime Fitness
+Orangetheory
+CrossFit
+Equinox
+Life Time Fitness
+
+# Services
+UPS Store
+FedEx
+USPS
+Great Clips
+Supercuts
+Sport Clips
+H&R Block
+Jackson Hewitt
+Liberty Tax
+
+# Phone/Tech
+Verizon
+AT&T
+T-Mobile
+Sprint
+Apple Store
+Microsoft Store
