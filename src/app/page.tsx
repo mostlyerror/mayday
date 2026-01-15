@@ -48,9 +48,80 @@ export default function Home() {
     }
   };
 
+  const checkScanStatus = async () => {
+    try {
+      const progressRes = await fetch('/api/scan');
+      if (progressRes.ok) {
+        const progress = await progressRes.json();
+        if (progress.status === 'running') {
+          // Auto-resume polling if scan is running
+          setScanning(true);
+          setScanProgress({
+            businessesScanned: progress.businessesScanned || 0,
+            newLeadsFound: progress.newLeadsFound || 0,
+            apiCallsUsed: progress.apiCallsUsed || 0
+          });
+          pollScanProgress();
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check scan status:', err);
+    }
+  };
+
   useEffect(() => {
     loadData();
+    checkScanStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const pollScanProgress = async () => {
+    let attempts = 0;
+    const maxAttempts = 300; // 5 minutes max
+
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      try {
+        const progressRes = await fetch('/api/scan');
+        if (!progressRes.ok) {
+          // If we get a 404 or other error during recompilation, just retry
+          attempts++;
+          continue;
+        }
+
+        const progress = await progressRes.json();
+
+        // Update progress display
+        setScanProgress({
+          businessesScanned: progress.businessesScanned || 0,
+          newLeadsFound: progress.newLeadsFound || 0,
+          apiCallsUsed: progress.apiCallsUsed || 0
+        });
+
+        if (progress.status === 'completed') {
+          await loadData(); // Refresh data
+          setScanning(false);
+          setScanProgress(null);
+          break;
+        }
+        if (progress.status === 'cancelled') {
+          setError('Scan was cancelled');
+          setScanning(false);
+          setScanProgress(null);
+          break;
+        }
+        if (progress.status === 'error') {
+          throw new Error(progress.error || 'Scan failed');
+        }
+      } catch {
+        // If JSON parsing fails (e.g., during recompilation), just retry
+        console.warn('Failed to parse scan progress, retrying...');
+      }
+
+      attempts++;
+    }
+  };
 
   const runScan = async () => {
     setError(null);
@@ -66,49 +137,22 @@ export default function Home() {
       });
 
       // Poll for progress
-      let attempts = 0;
-      const maxAttempts = 300; // 5 minutes max
-
-      while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        try {
-          const progressRes = await fetch('/api/scan');
-          if (!progressRes.ok) {
-            // If we get a 404 or other error during recompilation, just retry
-            attempts++;
-            continue;
-          }
-
-          const progress = await progressRes.json();
-
-          // Update progress display
-          setScanProgress({
-            businessesScanned: progress.businessesScanned || 0,
-            newLeadsFound: progress.newLeadsFound || 0,
-            apiCallsUsed: progress.apiCallsUsed || 0
-          });
-
-          if (progress.status === 'completed') {
-            await loadData(); // Refresh data
-            break;
-          }
-          if (progress.status === 'error') {
-            throw new Error(progress.error || 'Scan failed');
-          }
-        } catch {
-          // If JSON parsing fails (e.g., during recompilation), just retry
-          console.warn('Failed to parse scan progress, retrying...');
-        }
-
-        attempts++;
-      }
+      await pollScanProgress();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Scan failed';
       setError(message);
-    } finally {
       setScanning(false);
       setScanProgress(null);
+    }
+  };
+
+  const cancelScan = async () => {
+    try {
+      await fetch('/api/scan', { method: 'DELETE' });
+      setError('Cancelling scan...');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to cancel';
+      setError(message);
     }
   };
 
@@ -142,19 +186,29 @@ export default function Home() {
       {/* Scan Controls */}
       <div className="bg-white rounded-lg shadow p-6 mb-8">
         <h2 className="text-lg font-semibold mb-4">Scan Controls</h2>
-        <button
-          onClick={runScan}
-          disabled={scanning}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
+        <div className="flex gap-3">
+          <button
+            onClick={runScan}
+            disabled={scanning}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {scanning && (
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            )}
+            {scanning ? 'Scanning...' : 'Run Scan'}
+          </button>
           {scanning && (
-            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
+            <button
+              onClick={cancelScan}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+            >
+              Cancel Scan
+            </button>
           )}
-          {scanning ? 'Scanning...' : 'Run Scan'}
-        </button>
+        </div>
 
         {scanning && scanProgress && (
           <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">

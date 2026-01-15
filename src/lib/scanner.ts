@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 interface ScanProgress {
-  status: 'idle' | 'running' | 'completed' | 'error';
+  status: 'idle' | 'running' | 'completed' | 'error' | 'cancelled';
   currentZip?: string;
   businessesScanned: number;
   newLeadsFound: number;
@@ -32,8 +32,16 @@ let scanProgress: ScanProgress = {
   apiCallsUsed: 0
 };
 
+let shouldCancelScan = false;
+
 export function getScanProgress(): ScanProgress {
   return { ...scanProgress };
+}
+
+export function cancelScan(): void {
+  if (scanProgress.status === 'running') {
+    shouldCancelScan = true;
+  }
 }
 
 function delay(ms: number): Promise<void> {
@@ -56,9 +64,16 @@ export async function runScan(options: {
 
   const configPath = path.join(process.cwd(), 'config.json');
   const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  
-  const zipCodes = options.zipCodes || [config.center.lat + ',' + config.center.lng];
-  const query = options.query || 'business';
+
+  // Use actual business categories for better search results
+  const searchQueries = options.query ? [options.query] : [
+    'restaurant',
+    'retail store',
+    'professional services',
+    'health services',
+    'home services',
+    'auto services'
+  ];
   const radiusMeters = milesToMeters(config.radius_miles);
   const maxBusinesses = options.maxBusinesses || 1000;
 
@@ -70,31 +85,34 @@ export async function runScan(options: {
     startedAt: new Date().toISOString()
   };
 
+  shouldCancelScan = false;
   const runId = await startScanRun();
 
   try {
     let totalProcessed = 0;
 
-    for (const zip of zipCodes) {
+    for (const searchQuery of searchQueries) {
       if (totalProcessed >= maxBusinesses) break;
-      
-      scanProgress.currentZip = zip;
-      
+      if (shouldCancelScan) break;
+
+      scanProgress.currentZip = searchQuery; // Using currentZip field to show current search query
+
       let pageToken: string | undefined;
-      
+
       do {
         const searchResult = await searchPlaces(
-          `${query} ${zip}`,
+          searchQuery,
           config.center,
           radiusMeters,
           pageToken
         );
-        
+
         scanProgress.apiCallsUsed++;
 
         for (const place of searchResult.places) {
           if (totalProcessed >= maxBusinesses) break;
-          
+          if (shouldCancelScan) break;
+
           const exists = await businessExists(place.place_id);
           
           if (!exists) {
@@ -151,11 +169,16 @@ export async function runScan(options: {
           await delay(2000);
         }
         
-      } while (pageToken && totalProcessed < maxBusinesses);
+      } while (pageToken && totalProcessed < maxBusinesses && !shouldCancelScan);
     }
 
-    scanProgress.status = 'completed';
-    scanProgress.completedAt = new Date().toISOString();
+    if (shouldCancelScan) {
+      scanProgress.status = 'cancelled';
+      scanProgress.completedAt = new Date().toISOString();
+    } else {
+      scanProgress.status = 'completed';
+      scanProgress.completedAt = new Date().toISOString();
+    }
 
   } catch (error) {
     scanProgress.status = 'error';
@@ -184,12 +207,14 @@ export async function rescanDueBusinesses(): Promise<void> {
     startedAt: new Date().toISOString()
   };
 
+  shouldCancelScan = false;
   const runId = await startScanRun();
 
   try {
     const businesses = await getBusinessesDueForRescan();
 
     for (const business of businesses) {
+      if (shouldCancelScan) break;
       await delay(1000);
 
       const websiteResult = await checkWebsite(business.website_url || null, business.place_id);
@@ -223,8 +248,13 @@ export async function rescanDueBusinesses(): Promise<void> {
       }
     }
 
-    scanProgress.status = 'completed';
-    scanProgress.completedAt = new Date().toISOString();
+    if (shouldCancelScan) {
+      scanProgress.status = 'cancelled';
+      scanProgress.completedAt = new Date().toISOString();
+    } else {
+      scanProgress.status = 'completed';
+      scanProgress.completedAt = new Date().toISOString();
+    }
 
   } catch (error) {
     scanProgress.status = 'error';

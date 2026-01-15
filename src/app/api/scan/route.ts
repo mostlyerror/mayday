@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { runScan, rescanDueBusinesses, getScanProgress } from '@/lib/scanner';
+import { runScan, rescanDueBusinesses, getScanProgress, cancelScan } from '@/lib/scanner';
 
 export async function GET() {
   const progress = getScanProgress();
@@ -17,9 +17,22 @@ export async function POST(request: NextRequest) {
       runScan({ zipCodes, query, maxBusinesses }).catch(console.error);
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: 'Scan started',
+      progress: getScanProgress()
+    });
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+  }
+}
+
+export async function DELETE() {
+  try {
+    cancelScan();
+    return NextResponse.json({
+      success: true,
+      message: 'Scan cancelled',
       progress: getScanProgress()
     });
   } catch (error) {
