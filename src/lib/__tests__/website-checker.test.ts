@@ -1,4 +1,4 @@
-import { getNextScanDate, checkWebsite, WebsiteStatus } from '../website-checker';
+import { getNextScanDate, checkWebsite } from '../website-checker';
 
 // Mock the db module
 jest.mock('../db', () => ({

@@ -2,6 +2,8 @@ import { getScanProgress, runScan } from '../scanner';
 import * as db from '../db';
 import * as googlePlaces from '../google-places';
 import * as websiteChecker from '../website-checker';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Mock all external dependencies
 jest.mock('../db');
@@ -43,9 +45,6 @@ describe('scanner', () => {
       jest.clearAllMocks();
 
       // Mock fs and path for config loading
-      const fs = require('fs');
-      const path = require('path');
-
       (fs.readFileSync as jest.Mock).mockReturnValue(JSON.stringify(mockConfig));
       (path.join as jest.Mock).mockReturnValue('/mock/path/config.json');
 

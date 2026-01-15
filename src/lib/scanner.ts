@@ -138,7 +138,7 @@ export async function runScan(options: {
           });
 
           scanProgress.businessesScanned++;
-          if (websiteResult.leadType) {
+          if (websiteResult.leadType && wasUp && isDown) {
             scanProgress.newLeadsFound++;
           }
 
