@@ -24,44 +24,73 @@ export interface WebsiteCheckResult {
   socialLinks?: Record<string, string>;
 }
 
-const PLATFORM_SIGNATURES: Record<string, { patterns: RegExp[]; status: WebsiteStatus; detail: string }> = {
+const PLATFORM_SIGNATURES: Record<string, { patterns: RegExp[]; requiredMatches?: number; status: WebsiteStatus; detail: string }> = {
   squarespace_expired: {
-    patterns: [/website.*expired/i, /owner.*login.*squarespace/i, /this site is currently unavailable/i],
+    patterns: [
+      /your\s+trial\s+has\s+ended/i,
+      /this\s+website\s+is\s+no\s+longer\s+available/i,
+      /renew\s+your\s+subscription.*squarespace/i,
+      /squarespace.*subscription.*expired/i
+    ],
     status: 'hosting_expired',
     detail: 'Squarespace expired'
   },
   godaddy_parked: {
-    patterns: [/parked.*free.*courtesy.*godaddy/i, /this domain.*godaddy/i, /godaddy.*parked/i],
+    patterns: [
+      /parked\s+free.*courtesy\s+of\s+godaddy/i,
+      /this\s+web\s+page\s+is\s+parked.*godaddy/i,
+      /<title>parked\s+domain<\/title>/i
+    ],
     status: 'parked',
     detail: 'GoDaddy parked'
   },
   godaddy_expired: {
-    patterns: [/this domain has expired/i, /domain.*expired.*godaddy/i],
+    patterns: [
+      /this\s+domain\s+(?:name\s+)?has\s+expired/i,
+      /renew\s+(?:it\s+)?now.*godaddy/i
+    ],
     status: 'hosting_expired',
     detail: 'GoDaddy expired'
   },
   wix_expired: {
-    patterns: [/site.*not.*published/i, /wix.*site.*unavailable/i],
+    patterns: [
+      /this\s+site\s+was\s+created\s+with.*wix.*but\s+is\s+no\s+longer\s+active/i,
+      /wix\.com.*site\s+not\s+available/i,
+      /upgrade\s+your\s+wix\s+account/i
+    ],
     status: 'hosting_expired',
     detail: 'Wix expired'
   },
   weebly_expired: {
-    patterns: [/weebly.*site.*unavailable/i, /this site is no longer available/i],
+    patterns: [
+      /this\s+weebly\s+website\s+is\s+currently\s+unavailable/i,
+      /weebly\.com.*no\s+longer\s+available/i
+    ],
     status: 'hosting_expired',
     detail: 'Weebly expired'
   },
   namecheap_parked: {
-    patterns: [/namecheap.*parked/i, /domain.*parked.*namecheap/i],
+    patterns: [
+      /this\s+domain\s+is\s+parked\s+by.*namecheap/i,
+      /namecheap\.com.*parking/i
+    ],
     status: 'parked',
     detail: 'Namecheap parked'
   },
   generic_parked: {
-    patterns: [/domain.*parked/i, /this domain.*for sale/i, /buy this domain/i, /domain.*available/i],
+    patterns: [
+      /this\s+domain\s+(?:is\s+)?(?:for\s+sale|available\s+for\s+purchase)/i,
+      /buy\s+this\s+domain/i,
+      /<title>(?:domain\s+)?(?:for\s+sale|parked)<\/title>/i
+    ],
     status: 'parked',
     detail: 'Domain parked'
   },
   generic_suspended: {
-    patterns: [/account.*suspended/i, /website.*suspended/i, /hosting.*suspended/i],
+    patterns: [
+      /(?:account|website|hosting)\s+(?:has\s+been\s+)?suspended/i,
+      /this\s+(?:account|site)\s+is\s+suspended/i
+    ],
     status: 'hosting_expired',
     detail: 'Hosting suspended'
   }
@@ -93,11 +122,29 @@ function extractSocialLinks(html: string): Record<string, string> {
 }
 
 function detectPlatform(html: string): { platform: string; status: WebsiteStatus; detail: string } | null {
+  // Remove HTML to get text length for context checking
+  const textContent = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const contentLength = textContent.length;
+
+  // If the page has substantial content (>2000 chars), it's likely a real site
+  // Even if it mentions these terms in a blog post or help documentation
+  const isSubstantialContent = contentLength > 2000;
+
   for (const [platform, config] of Object.entries(PLATFORM_SIGNATURES)) {
+    let matchCount = 0;
+
     for (const pattern of config.patterns) {
       if (pattern.test(html)) {
-        return { platform, status: config.status, detail: config.detail };
+        matchCount++;
       }
+    }
+
+    // For substantial content, require at least 2 pattern matches to reduce false positives
+    // For short content, 1 match is sufficient as it's likely an error page
+    const requiredMatches = isSubstantialContent ? 2 : 1;
+
+    if (matchCount >= requiredMatches) {
+      return { platform, status: config.status, detail: config.detail };
     }
   }
   return null;
@@ -119,7 +166,13 @@ async function fetchWithRetry(url: string, retries = 2): Promise<Response> {
         signal: controller.signal,
         redirect: 'follow',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'DNT': '1',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1'
         }
       });
       
@@ -170,6 +223,29 @@ export async function checkWebsite(url: string | null, placeId: string): Promise
 
     // Check HTTP status
     if (response.status >= 400 && response.status < 500) {
+      // 403 Forbidden is often bot detection, not a broken site
+      // Only flag it if we're certain it's a real error
+      if (response.status === 403) {
+        // Large retailers and chains likely have bot protection - not a lead
+        // Check if this looks like bot protection by examining response
+        const isLikelyBotProtection =
+          html.includes('Access Denied') ||
+          html.includes('Cloudflare') ||
+          html.includes('security check') ||
+          html.includes('bot') ||
+          html.length < 1000; // Very short responses are often bot blocks
+
+        if (isLikelyBotProtection) {
+          // Treat as "up" - site is fine, just blocking bots
+          return {
+            status: 'up',
+            leadType: null,
+            socialLinks
+          };
+        }
+      }
+
+      // For other 4xx errors (404, 401, etc.), flag as broken
       return {
         status: 'http_4xx',
         statusDetail: response.status.toString(),
