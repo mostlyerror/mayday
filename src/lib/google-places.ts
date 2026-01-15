@@ -22,15 +22,17 @@ interface PlaceResult {
   business_status?: string;
 }
 
-interface TextSearchResponse {
-  results: PlaceResult[];
-  next_page_token?: string;
-  status: string;
-}
-
-interface PlaceDetailsResponse {
-  result: PlaceResult;
-  status: string;
+interface GooglePlacesNewAPIPlace {
+  id: string;
+  displayName?: { text: string };
+  formattedAddress?: string;
+  nationalPhoneNumber?: string;
+  websiteUri?: string;
+  types?: string[];
+  userRatingCount?: number;
+  rating?: number;
+  location?: { latitude: number; longitude: number };
+  businessStatus?: string;
 }
 
 let chainBlocklist: string[] | null = null;
@@ -63,59 +65,107 @@ function isChain(businessName: string): boolean {
 
 export async function searchPlaces(
   query: string,
-  location: { lat: number; lng: number },
+  location: { lat: number; lng: number; label: string },
   radiusMeters: number,
   pageToken?: string
 ): Promise<{ places: PlaceResult[]; nextPageToken?: string }> {
   if (!API_KEY) throw new Error('GOOGLE_PLACES_API_KEY not set');
 
-  const url = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
-  url.searchParams.set('key', API_KEY);
-  
-  if (pageToken) {
-    url.searchParams.set('pagetoken', pageToken);
-  } else {
-    url.searchParams.set('query', query);
-    url.searchParams.set('location', `${location.lat},${location.lng}`);
-    url.searchParams.set('radius', radiusMeters.toString());
+  // New Places API uses POST with JSON body
+  const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': API_KEY,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.types,places.userRatingCount,places.rating,places.location,places.businessStatus,nextPageToken'
+    },
+    body: JSON.stringify({
+      textQuery: query,
+      locationBias: {
+        circle: {
+          center: { latitude: location.lat, longitude: location.lng },
+          radius: radiusMeters
+        }
+      },
+      pageToken
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Google Places API error: ${response.status}`);
   }
 
-  const response = await fetch(url.toString());
-  const data: TextSearchResponse = await response.json();
-
-  if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-    throw new Error(`Google Places API error: ${data.status}`);
-  }
+  const data = await response.json();
 
   await trackApiUsage('text_search', 1, COSTS.textSearch);
 
-  const filteredPlaces = data.results.filter(place => {
+  // Convert new API format to old format for compatibility
+  const places: PlaceResult[] = (data.places || []).map((place: GooglePlacesNewAPIPlace) => ({
+    place_id: place.id,
+    name: place.displayName?.text || '',
+    formatted_address: place.formattedAddress,
+    formatted_phone_number: place.nationalPhoneNumber,
+    website: place.websiteUri,
+    types: place.types || [],
+    user_ratings_total: place.userRatingCount,
+    rating: place.rating,
+    geometry: place.location ? {
+      location: {
+        lat: place.location.latitude,
+        lng: place.location.longitude
+      }
+    } : undefined,
+    business_status: place.businessStatus
+  }));
+
+  const filteredPlaces = places.filter(place => {
     if (place.business_status === 'CLOSED_PERMANENTLY') return false;
     if (isChain(place.name)) return false;
     return true;
   });
 
-  return { places: filteredPlaces, nextPageToken: data.next_page_token };
+  return { places: filteredPlaces, nextPageToken: data.nextPageToken };
 }
 
 export async function getPlaceDetails(placeId: string): Promise<PlaceResult | null> {
   if (!API_KEY) throw new Error('GOOGLE_PLACES_API_KEY not set');
 
-  const url = new URL('https://maps.googleapis.com/maps/api/place/details/json');
-  url.searchParams.set('key', API_KEY);
-  url.searchParams.set('place_id', placeId);
-  url.searchParams.set('fields', 'place_id,name,formatted_address,formatted_phone_number,website,types,user_ratings_total,rating,geometry,business_status');
+  // New Places API uses GET with place ID in path
+  const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
+    method: 'GET',
+    headers: {
+      'X-Goog-Api-Key': API_KEY,
+      'X-Goog-FieldMask': 'id,displayName,formattedAddress,nationalPhoneNumber,websiteUri,types,userRatingCount,rating,location,businessStatus'
+    }
+  });
 
-  const response = await fetch(url.toString());
-  const data: PlaceDetailsResponse = await response.json();
-
-  if (data.status !== 'OK') {
-    if (data.status === 'NOT_FOUND') return null;
-    throw new Error(`Google Places API error: ${data.status}`);
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    throw new Error(`Google Places API error: ${response.status}`);
   }
 
+  const place = await response.json();
+
   await trackApiUsage('place_details', 1, COSTS.placeDetails);
-  return data.result;
+
+  // Convert new API format to old format for compatibility
+  return {
+    place_id: place.id,
+    name: place.displayName?.text || '',
+    formatted_address: place.formattedAddress,
+    formatted_phone_number: place.nationalPhoneNumber,
+    website: place.websiteUri,
+    types: place.types || [],
+    user_ratings_total: place.userRatingCount,
+    rating: place.rating,
+    geometry: place.location ? {
+      location: {
+        lat: place.location.latitude,
+        lng: place.location.longitude
+      }
+    } : undefined,
+    business_status: place.businessStatus
+  };
 }
 
 export function placeToBusinessData(place: PlaceResult) {
