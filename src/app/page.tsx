@@ -20,6 +20,12 @@ interface Stats {
   hotLeads: number;
 }
 
+const LEAD_TYPE_LABELS: Record<string, string> = {
+  fix: '🔧 Fix',
+  build: '🏗️ Build',
+  social_only: '📱 Social Only',
+};
+
 export default function Home() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -215,10 +221,14 @@ export default function Home() {
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {lead.lead_type || '-'}
+                  {lead.lead_type ? LEAD_TYPE_LABELS[lead.lead_type] || lead.lead_type : '-'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {lead.days_down !== undefined ? `${lead.days_down}d` : '-'}
+                  {lead.days_down !== undefined ? (
+                    <span className={lead.days_down <= 7 ? 'text-red-600 font-medium' : ''}>
+                      {lead.days_down}d {lead.days_down <= 7 && '🔥'}
+                    </span>
+                  ) : '-'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                   {lead.website_url && (
