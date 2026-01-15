@@ -184,7 +184,8 @@ export default function Home() {
 
       {/* Leads Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full">
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business</th>
@@ -198,19 +199,19 @@ export default function Home() {
           <tbody className="bg-white divide-y divide-gray-200">
             {leads.map((lead) => (
               <tr key={lead.place_id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="font-medium text-gray-900">{lead.name}</div>
+                <td className="px-6 py-4">
+                  <div className="font-medium text-gray-900 min-w-[150px]">{lead.name}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-500">{lead.phone || 'N/A'}</div>
+                <td className="px-6 py-4">
+                  <div className="text-sm text-gray-500 min-w-[200px]">{lead.phone || 'N/A'}</div>
                   <div className="text-sm text-gray-400">{lead.address}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                <td className="px-6 py-4">
+                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 whitespace-nowrap">
                     {lead.status}
                   </span>
                   {lead.status_detail && (
-                    <div className="text-xs text-gray-500 mt-1">{lead.status_detail}</div>
+                    <div className="text-xs text-gray-500 mt-1 whitespace-nowrap">{lead.status_detail}</div>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -243,6 +244,7 @@ export default function Home() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
