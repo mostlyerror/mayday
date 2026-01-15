@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { COSTS } from '@/lib/constants';
 
 interface Lead {
   place_id: string;
@@ -413,24 +414,24 @@ export default function Home() {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Used This Month:</span>
                     <span className="font-medium text-gray-900">
-                      ${stats?.apiUsage?.thisMonth.cost.toFixed(2) || '0.00'}
+                      ${scanProgress ? ((scanProgress.apiCallsUsed * COSTS.textSearch) + (scanProgress.apiCallsUsed * COSTS.placeDetails)).toFixed(2) : '0.00'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Remaining:</span>
                     <span className="font-medium text-green-700">
-                      ${stats?.apiUsage?.remainingBudget.toFixed(2) || config.monthly_budget_usd.toFixed(2)}
+                      ${scanProgress ? (config.monthly_budget_usd - ((scanProgress.apiCallsUsed * COSTS.textSearch) + (scanProgress.apiCallsUsed * COSTS.placeDetails))).toFixed(2) : config.monthly_budget_usd}
                     </span>
                   </div>
                   <div className="mt-3 pt-3 border-t border-green-200">
                     <div className="text-xs text-gray-600 space-y-1">
                       <div className="flex justify-between">
                         <span>Text Search:</span>
-                        <span>$0.032 per request</span>
+                        <span>${COSTS.textSearch.toFixed(3)} per request</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Place Details:</span>
-                        <span>$0.017 per request</span>
+                        <span>${COSTS.placeDetails.toFixed(3)} per request</span>
                       </div>
                     </div>
                   </div>
@@ -449,7 +450,7 @@ export default function Home() {
                   <p className="text-sm text-gray-600">
                     With your ${config.monthly_budget_usd} budget, you can scan approximately{' '}
                     <span className="font-semibold text-gray-900">
-                      {Math.floor(config.monthly_budget_usd / ((0.032 + 0.017)))} businesses
+                      {Math.floor(config.monthly_budget_usd / ((COSTS.textSearch + COSTS.placeDetails)))} businesses
                     </span>{' '}
                     per month (includes Text Search + Place Details for each business).
                   </p>

@@ -1,13 +1,9 @@
 import { trackApiUsage } from './db';
 import * as fs from 'fs';
 import * as path from 'path';
+import { COSTS } from './constants';
 
 const API_KEY = process.env.GOOGLE_PLACES_API_KEY;
-
-const COSTS = {
-  textSearch: 0.032,
-  placeDetails: 0.017,
-};
 
 interface PlaceResult {
   place_id: string;
