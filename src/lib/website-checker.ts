@@ -156,12 +156,17 @@ function isSocialRedirect(url: string): boolean {
 
 async function fetchWithRetry(url: string, retries = 2): Promise<Response> {
   let lastError: Error | null = null;
-  
+
+  // Progressive timeouts: start at 15s, increase to 20s, then 30s
+  // This gives slow but legitimate sites more time to respond
+  const timeouts = [15000, 20000, 30000];
+
   for (let i = 0; i <= retries; i++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-      
+      const timeoutMs = timeouts[i] || 30000;
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
       const response = await fetch(url, {
         signal: controller.signal,
         redirect: 'follow',
@@ -175,17 +180,18 @@ async function fetchWithRetry(url: string, retries = 2): Promise<Response> {
           'Upgrade-Insecure-Requests': '1'
         }
       });
-      
+
       clearTimeout(timeout);
       return response;
     } catch (error) {
       lastError = error as Error;
       if (i < retries) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait 2 seconds between retries to give server time to recover
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
   }
-  
+
   throw lastError;
 }
 
