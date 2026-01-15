@@ -462,7 +462,7 @@ export default function Home() {
       </div>
 
       {/* Leads Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow overflow-x-auto">
         {leads.length === 0 ? (
           <div className="px-6 py-16 text-center">
             <div className="max-w-md mx-auto">
