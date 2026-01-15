@@ -134,6 +134,12 @@ npm run test:coverage    # Generate coverage report
 - Platform detection (GoDaddy, Squarespace, etc.)
 - Error handling (network errors, SSL issues, DNS failures)
 
+**CI/CD**:
+- GitHub Actions workflow runs on push/PR to main
+- Automated checks: lint, test, build
+- Workflow file: `.github/workflows/ci.yml`
+- Uses Node.js 20.x with npm caching
+
 ## Database Schema
 
 **Tables**:
