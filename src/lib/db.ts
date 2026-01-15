@@ -1,16 +1,35 @@
 import { neon } from '@neondatabase/serverless';
 
 function getDb() {
-  const url = process.env.DATABASE_URL;
+  // Use unpooled connection to avoid transaction isolation issues with Neon pooling
+  const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL not set');
-  return neon(url);
+
+  // Create a new client each time with cache disabled
+  // fetchOptions helps bypass Neon's HTTP cache
+  return neon(url, {
+    fetchOptions: {
+      cache: 'no-store'
+    }
+  });
 }
 
 export async function initializeDb(): Promise<void> {
   const sql = getDb();
-  
+
+  console.log('[initializeDb] Starting database initialization...');
+
+  // Drop tables if they exist to start fresh
+  await sql`DROP TABLE IF EXISTS lead_tracking CASCADE`;
+  await sql`DROP TABLE IF EXISTS scan_results CASCADE`;
+  await sql`DROP TABLE IF EXISTS scan_runs CASCADE`;
+  await sql`DROP TABLE IF EXISTS api_usage CASCADE`;
+  await sql`DROP TABLE IF EXISTS businesses CASCADE`;
+
+  console.log('[initializeDb] Tables dropped successfully');
+
   await sql`
-    CREATE TABLE IF NOT EXISTS businesses (
+    CREATE TABLE businesses (
       place_id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       address TEXT,
@@ -28,7 +47,7 @@ export async function initializeDb(): Promise<void> {
   `;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS scan_results (
+    CREATE TABLE scan_results (
       id SERIAL PRIMARY KEY,
       place_id TEXT NOT NULL REFERENCES businesses(place_id),
       scan_date TIMESTAMP DEFAULT NOW(),
@@ -42,7 +61,7 @@ export async function initializeDb(): Promise<void> {
   `;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS api_usage (
+    CREATE TABLE api_usage (
       id SERIAL PRIMARY KEY,
       date DATE NOT NULL,
       endpoint TEXT NOT NULL,
@@ -52,7 +71,7 @@ export async function initializeDb(): Promise<void> {
   `;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS lead_tracking (
+    CREATE TABLE lead_tracking (
       id SERIAL PRIMARY KEY,
       place_id TEXT NOT NULL UNIQUE REFERENCES businesses(place_id),
       status TEXT DEFAULT 'new',
@@ -62,7 +81,7 @@ export async function initializeDb(): Promise<void> {
   `;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS scan_runs (
+    CREATE TABLE scan_runs (
       id SERIAL PRIMARY KEY,
       started_at TIMESTAMP DEFAULT NOW(),
       completed_at TIMESTAMP,
