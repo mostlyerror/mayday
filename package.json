@@ -10,7 +10,10 @@
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "db:reset": "ts-node --project scripts/tsconfig.json scripts/reset-db.ts",
+    "db:check": "ts-node --project scripts/tsconfig.json scripts/check-scan-results.ts",
+    "test:url": "ts-node --project scripts/tsconfig.json scripts/test-single-url.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
@@ -25,6 +28,7 @@
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "autoprefixer": "^10.4.0",
+    "dotenv": "^17.2.3",
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.35",
     "jest": "^30.2.0",

@@ -148,6 +148,22 @@ describe('website-checker', () => {
       expect(result.leadType).toBe('fix');
     });
 
+    it('should treat 403 with bot protection as up (not a lead)', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 403,
+        url: 'https://example.com',
+        text: jest.fn().mockResolvedValue('<html><head><title>Access Denied</title></head><body>Access Denied - security check in progress</body></html>'),
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      const result = await checkWebsite('https://example.com', mockPlaceId);
+
+      expect(result.status).toBe('up');
+      expect(result.leadType).toBeNull();
+    });
+
     it('should detect 5xx errors', async () => {
       const mockResponse = {
         ok: false,
@@ -187,7 +203,7 @@ describe('website-checker', () => {
         ok: true,
         status: 200,
         url: 'https://example.com',
-        text: jest.fn().mockResolvedValue('<html><body>This website has expired. Please login to Squarespace to renew.</body></html>'),
+        text: jest.fn().mockResolvedValue('<html><head><title>Subscription Expired</title></head><body><h1>Your trial has ended</h1><p>This website is no longer available. To restore access, renew your subscription at Squarespace.</p></body></html>'),
       };
 
       (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
@@ -289,6 +305,100 @@ describe('website-checker', () => {
       expect(result.socialLinks?.facebook).toContain('facebook.com/mybusiness');
       expect(result.socialLinks?.instagram).toContain('instagram.com/mybiz');
       expect(result.socialLinks?.twitter).toContain('twitter.com/mybiz');
+    });
+
+    it('should not flag a working site with substantial content that mentions "expired" in a blog post', async () => {
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        url: 'https://restaurant.com',
+        text: jest.fn().mockResolvedValue(`
+          <html>
+            <head><title>Garde & Grace - Fine Dining Restaurant</title></head>
+            <body>
+              <nav>Home | Menu | About | Contact</nav>
+              <h1>Welcome to Garde & Grace</h1>
+              <p>Experience our world-class cuisine in the heart of downtown.</p>
+              <section>
+                <h2>Menu</h2>
+                <p>Appetizers, Entrees, Desserts...</p>
+                <div>Extensive menu content here with hundreds of words describing dishes...</div>
+              </section>
+              <section>
+                <h2>Blog</h2>
+                <article>
+                  <h3>What to do when your website hosting has expired</h3>
+                  <p>This is a helpful guide for business owners whose website might have issues...</p>
+                  <p>Additional content with lots of text to make this a substantial article with real content...</p>
+                  <p>More paragraphs discussing hosting, domains, and website management...</p>
+                  <p>Even more content to ensure this is clearly a working site with real content...</p>
+                  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+                  <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+                  <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+                  <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+                </article>
+              </section>
+              <footer>Contact: 555-1234 | Address: 123 Main St</footer>
+            </body>
+          </html>
+        `),
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      const result = await checkWebsite('https://restaurant.com', mockPlaceId);
+
+      expect(result.status).toBe('up');
+      expect(result.leadType).toBeNull();
+    });
+
+    it('should not flag a working site that mentions "suspended" in help documentation', async () => {
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        url: 'https://business.com',
+        text: jest.fn().mockResolvedValue(`
+          <html>
+            <head><title>Spindletop Bar - Houston</title></head>
+            <body>
+              <header>
+                <nav>Home | Services | About | FAQ | Contact</nav>
+              </header>
+              <main>
+                <h1>Welcome to Our Business</h1>
+                <p>We provide excellent services to our customers...</p>
+                <section>
+                  <h2>Our Services</h2>
+                  <ul>
+                    <li>Service 1 with detailed description...</li>
+                    <li>Service 2 with detailed description...</li>
+                    <li>Service 3 with detailed description...</li>
+                  </ul>
+                </section>
+                <section>
+                  <h2>FAQ</h2>
+                  <h3>What happens if my account is suspended?</h3>
+                  <p>If your account gets suspended, you can contact support to resolve the issue.</p>
+                  <p>We never suspend accounts without warning and always work with customers...</p>
+                  <p>More detailed information about account policies and procedures...</p>
+                  <p>Additional paragraphs with substantial content about the business...</p>
+                  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum at eros.</p>
+                  <p>Cras mattis consectetur purus sit amet fermentum. Nullam quis risus eget urna.</p>
+                  <p>Praesent commodo cursus magna, vel scelerisque nisl consectetur et.</p>
+                </section>
+              </main>
+              <footer>Copyright 2024 | Privacy Policy | Terms</footer>
+            </body>
+          </html>
+        `),
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      const result = await checkWebsite('https://business.com', mockPlaceId);
+
+      expect(result.status).toBe('up');
+      expect(result.leadType).toBeNull();
     });
   });
 });

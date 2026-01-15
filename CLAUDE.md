@@ -12,6 +12,7 @@ npm run lint             # ESLint
 npm test                 # Run Jest test suite
 npm run test:watch       # Run tests in watch mode
 npm run test:coverage    # Generate test coverage report
+npm run db:reset         # Reset database (drops all tables and recreates schema)
 ```
 
 ## Architecture
