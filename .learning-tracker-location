@@ -1,0 +1,7 @@
+The learning tracker has been moved to a global location for cross-project use:
+~/.claude/LEARNING_TRACKER.md
+
+The learning-tracker skill will automatically find and use this global tracker.
+
+Web Development Learning Track (Next.js/React/TypeScript/Vercel) is tracked in the
+"Web Development Learning Track - Mayday Project" section.
