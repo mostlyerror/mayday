@@ -52,6 +52,11 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [sidePanelOpen, setSidePanelOpen] = useState(true);
   const [showConfig, setShowConfig] = useState(false);
+  const [isEditingConfig, setIsEditingConfig] = useState(false);
+  const [configForm, setConfigForm] = useState<Config | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [configSuccess, setConfigSuccess] = useState<string | null>(null);
+  const [configSaving, setConfigSaving] = useState(false);
 
   const loadData = async () => {
     try {
@@ -70,6 +75,95 @@ export default function Home() {
       setConfig(configData);
     } catch (err) {
       console.error('Failed to load data:', err);
+    }
+  };
+
+  const startEditingConfig = () => {
+    setConfigForm(config ? { ...config } : null);
+    setIsEditingConfig(true);
+    setConfigError(null);
+    setConfigSuccess(null);
+  };
+
+  const cancelEditingConfig = () => {
+    setIsEditingConfig(false);
+    setConfigForm(null);
+    setConfigError(null);
+  };
+
+  const updateConfigField = (field: string, value: string | number) => {
+    if (!configForm) return;
+
+    if (field.startsWith('center.')) {
+      const centerField = field.split('.')[1];
+      setConfigForm({
+        ...configForm,
+        center: {
+          ...configForm.center,
+          [centerField]: value
+        }
+      });
+    } else {
+      setConfigForm({
+        ...configForm,
+        [field]: value
+      });
+    }
+  };
+
+  const saveConfig = async () => {
+    if (!configForm) return;
+
+    setConfigError(null);
+    setConfigSuccess(null);
+    setConfigSaving(true);
+
+    try {
+      // Client-side validation
+      if (configForm.center.lat < -90 || configForm.center.lat > 90) {
+        throw new Error('Latitude must be between -90 and 90');
+      }
+      if (configForm.center.lng < -180 || configForm.center.lng > 180) {
+        throw new Error('Longitude must be between -180 and 180');
+      }
+      if (configForm.radius_miles <= 0 || configForm.radius_miles > 50) {
+        throw new Error('Radius must be between 1 and 50 miles');
+      }
+      if (configForm.monthly_budget_usd <= 0) {
+        throw new Error('Monthly budget must be greater than 0');
+      }
+      if (!configForm.center.label.trim()) {
+        throw new Error('Location label is required');
+      }
+
+      // API call
+      const response = await fetch('/api/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(configForm)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save configuration');
+      }
+
+      const savedConfig = await response.json();
+
+      // Update state optimistically
+      setConfig(savedConfig.config);
+      setIsEditingConfig(false);
+      setConfigForm(null);
+      setConfigSuccess('Configuration saved successfully!');
+
+      // Auto-dismiss success message after 4 seconds
+      setTimeout(() => setConfigSuccess(null), 4000);
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save configuration';
+      setConfigError(message);
+    } finally {
+      setConfigSaving(false);
     }
   };
 
@@ -375,8 +469,31 @@ export default function Home() {
         {/* Configuration Panel */}
         {showConfig && config && (
           <div className="mt-6 pt-6 border-t border-gray-200">
+            {/* Success/Error Messages */}
+            {configSuccess && (
+              <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <svg className="h-5 w-5 text-green-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-sm text-green-700 font-medium">{configSuccess}</p>
+                </div>
+              </div>
+            )}
+
+            {configError && (
+              <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <svg className="h-5 w-5 text-red-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-sm text-red-700 font-medium">{configError}</p>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Location & Radius */}
+              {/* Location & Radius Card */}
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="p-2 bg-blue-100 rounded-lg">
@@ -387,30 +504,70 @@ export default function Home() {
                   </div>
                   <h3 className="font-semibold text-gray-900">Scan Location</h3>
                 </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Location:</span>
-                    <span className="font-medium text-gray-900">{config.center.label}</span>
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <label className="block text-gray-600 mb-1">Location Label</label>
+                    <input
+                      type="text"
+                      maxLength={100}
+                      disabled={!isEditingConfig}
+                      value={isEditingConfig ? (configForm?.center.label || '') : config.center.label}
+                      onChange={(e) => updateConfigField('center.label', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-900"
+                    />
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Coordinates:</span>
-                    <span className="font-mono text-xs text-gray-700">
-                      {config.center.lat.toFixed(4)}, {config.center.lng.toFixed(4)}
-                    </span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-gray-600 mb-1">Latitude</label>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        min="-90"
+                        max="90"
+                        disabled={!isEditingConfig}
+                        value={isEditingConfig ? (configForm?.center.lat || 0) : config.center.lat}
+                        onChange={(e) => updateConfigField('center.lat', parseFloat(e.target.value))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 mb-1">Longitude</label>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        min="-180"
+                        max="180"
+                        disabled={!isEditingConfig}
+                        value={isEditingConfig ? (configForm?.center.lng || 0) : config.center.lng}
+                        onChange={(e) => updateConfigField('center.lng', parseFloat(e.target.value))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-900"
+                      />
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Radius:</span>
-                    <span className="font-medium text-gray-900">{config.radius_miles} miles</span>
+                  <div>
+                    <label className="block text-gray-600 mb-1">Radius (miles)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      max="50"
+                      disabled={!isEditingConfig}
+                      value={isEditingConfig ? (configForm?.radius_miles || 1) : config.radius_miles}
+                      onChange={(e) => updateConfigField('radius_miles', parseFloat(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-900"
+                    />
                   </div>
-                  <div className="mt-3 pt-3 border-t border-blue-200">
-                    <p className="text-xs text-gray-600">
-                      Scanning within {config.radius_miles} miles of {config.center.label}
-                    </p>
-                  </div>
+                  {!isEditingConfig && (
+                    <div className="mt-3 pt-3 border-t border-blue-200">
+                      <p className="text-xs text-gray-600">
+                        Scanning within {config.radius_miles} miles of {config.center.label}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Budget & API Costs */}
+              {/* Budget Card */}
               <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-100">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="p-2 bg-green-100 rounded-lg">
@@ -420,56 +577,115 @@ export default function Home() {
                   </div>
                   <h3 className="font-semibold text-gray-900">API Budget</h3>
                 </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Monthly Budget:</span>
-                    <span className="font-medium text-gray-900">${config.monthly_budget_usd}</span>
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <label className="block text-gray-600 mb-1">Monthly Budget (USD)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      disabled={!isEditingConfig}
+                      value={isEditingConfig ? (configForm?.monthly_budget_usd || 1) : config.monthly_budget_usd}
+                      onChange={(e) => updateConfigField('monthly_budget_usd', parseFloat(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-900"
+                    />
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Used This Month:</span>
-                    <span className="font-medium text-gray-900">
-                      ${scanProgress ? ((scanProgress.apiCallsUsed * COSTS.textSearch) + (scanProgress.apiCallsUsed * COSTS.placeDetails)).toFixed(2) : '0.00'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Remaining:</span>
-                    <span className="font-medium text-green-700">
-                      ${scanProgress ? (config.monthly_budget_usd - ((scanProgress.apiCallsUsed * COSTS.textSearch) + (scanProgress.apiCallsUsed * COSTS.placeDetails))).toFixed(2) : config.monthly_budget_usd}
-                    </span>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-green-200">
-                    <div className="text-xs text-gray-600 space-y-1">
+                  {!isEditingConfig && (
+                    <>
                       <div className="flex justify-between">
-                        <span>Text Search:</span>
-                        <span>${COSTS.textSearch.toFixed(3)} per request</span>
+                        <span className="text-gray-600">Used This Month:</span>
+                        <span className="font-medium text-gray-900">
+                          ${scanProgress ? ((scanProgress.apiCallsUsed * COSTS.textSearch) + (scanProgress.apiCallsUsed * COSTS.placeDetails)).toFixed(2) : '0.00'}
+                        </span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Place Details:</span>
-                        <span>${COSTS.placeDetails.toFixed(3)} per request</span>
+                        <span className="text-gray-600">Remaining:</span>
+                        <span className="font-medium text-green-700">
+                          ${scanProgress ? (config.monthly_budget_usd - ((scanProgress.apiCallsUsed * COSTS.textSearch) + (scanProgress.apiCallsUsed * COSTS.placeDetails))).toFixed(2) : config.monthly_budget_usd}
+                        </span>
                       </div>
+                      <div className="mt-3 pt-3 border-t border-green-200">
+                        <div className="text-xs text-gray-600 space-y-1">
+                          <div className="flex justify-between">
+                            <span>Text Search:</span>
+                            <span>${COSTS.textSearch.toFixed(3)} per request</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Place Details:</span>
+                            <span>${COSTS.placeDetails.toFixed(3)} per request</span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  {isEditingConfig && configForm && (
+                    <div className="mt-3 pt-3 border-t border-green-200">
+                      <p className="text-xs text-gray-600">
+                        Estimated capacity:{' '}
+                        <span className="font-semibold text-gray-900">
+                          ~{Math.floor(configForm.monthly_budget_usd / (COSTS.textSearch + COSTS.placeDetails))} businesses/month
+                        </span>
+                      </p>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Capacity Estimate */}
-            <div className="mt-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <div className="flex items-start gap-3">
-                <svg className="h-5 w-5 text-gray-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900 mb-1">Monthly Capacity</p>
-                  <p className="text-sm text-gray-600">
-                    With your ${config.monthly_budget_usd} budget, you can scan approximately{' '}
-                    <span className="font-semibold text-gray-900">
-                      {Math.floor(config.monthly_budget_usd / ((COSTS.textSearch + COSTS.placeDetails)))} businesses
-                    </span>{' '}
-                    per month (includes Text Search + Place Details for each business).
-                  </p>
+            {/* Capacity Estimate (View Mode Only) */}
+            {!isEditingConfig && (
+              <div className="mt-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="flex items-start gap-3">
+                  <svg className="h-5 w-5 text-gray-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900 mb-1">Monthly Capacity</p>
+                    <p className="text-sm text-gray-600">
+                      With your ${config.monthly_budget_usd} budget, you can scan approximately{' '}
+                      <span className="font-semibold text-gray-900">
+                        {Math.floor(config.monthly_budget_usd / (COSTS.textSearch + COSTS.placeDetails))} businesses
+                      </span>{' '}
+                      per month (includes Text Search + Place Details for each business).
+                    </p>
+                  </div>
                 </div>
               </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="mt-4 flex justify-end gap-3">
+              {!isEditingConfig ? (
+                <button
+                  onClick={startEditingConfig}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-sm font-medium"
+                >
+                  Edit Configuration
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={cancelEditingConfig}
+                    disabled={configSaving}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveConfig}
+                    disabled={configSaving}
+                    className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:from-orange-600 hover:to-red-700 transition-all duration-200 shadow-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {configSaving && (
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    )}
+                    {configSaving ? 'Saving...' : 'Save Configuration'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
