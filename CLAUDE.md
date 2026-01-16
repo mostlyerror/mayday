@@ -30,6 +30,7 @@ The app identifies three types of leads:
 
 - **Frontend**: Next.js 14 with App Router, React 18, Tailwind CSS
 - **Database**: Neon PostgreSQL with `@neondatabase/serverless`
+- **Authentication**: NextAuth.js with credentials provider
 - **External APIs**: Google Places API (Text Search + Place Details)
 
 ### Project Structure
@@ -60,6 +61,10 @@ The app identifies three types of leads:
 ```bash
 DATABASE_URL=postgresql://...          # Neon PostgreSQL connection string
 GOOGLE_PLACES_API_KEY=...             # Google Places API key
+NEXTAUTH_URL=http://localhost:3000    # NextAuth URL (use production URL in deployment)
+NEXTAUTH_SECRET=...                   # NextAuth secret (generate with: openssl rand -base64 32)
+AUTH_USERNAME=admin                   # Login username
+AUTH_PASSWORD=...                     # Login password
 ```
 
 **Location Config** (`config.json`):
@@ -166,6 +171,26 @@ npm run test:coverage    # Generate coverage report
 - 1 second delay between website checks
 - 2 second delay between paginated search results
 
+## Authentication
+
+The app is protected by NextAuth.js to prevent unauthorized API usage:
+
+**Login Page**: `/login`
+- Simple credentials-based authentication
+- Username and password stored in environment variables
+- Session managed with JWT strategy
+
+**Protected Routes**:
+- Dashboard (`/`)
+- All API routes (`/api/scan`, `/api/leads`, `/api/export`, `/api/stats`, `/api/config`)
+
+**Setup**:
+1. Generate a secure NEXTAUTH_SECRET: `openssl rand -base64 32`
+2. Set `AUTH_USERNAME` and `AUTH_PASSWORD` in `.env`
+3. Set `NEXTAUTH_URL` to your deployment URL (e.g., `https://your-app.vercel.app`)
+
+**Access**: Users must log in to access the dashboard and API endpoints.
+
 ## Git Workflow
 
 - Never rebase commits that have been pushed to remote — only rebase local, unpushed commits
@@ -176,7 +201,13 @@ npm run test:coverage    # Generate coverage report
 **Vercel Deployment**:
 1. Create Neon database at [neon.tech](https://neon.tech)
 2. Push to GitHub and import in Vercel
-3. Add environment variables: `DATABASE_URL`, `GOOGLE_PLACES_API_KEY`
+3. Add environment variables:
+   - `DATABASE_URL`
+   - `GOOGLE_PLACES_API_KEY`
+   - `NEXTAUTH_URL` (your Vercel app URL)
+   - `NEXTAUTH_SECRET` (generate with `openssl rand -base64 32`)
+   - `AUTH_USERNAME`
+   - `AUTH_PASSWORD`
 4. After deploying, initialize database: `curl -X POST https://your-app.vercel.app/api/init`
 
 **Local Development**:

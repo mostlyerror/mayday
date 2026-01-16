@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { signOut } from 'next-auth/react';
 import { COSTS } from '@/lib/constants';
 
 interface Lead {
@@ -196,17 +197,30 @@ export default function Home() {
             </div>
 
             {/* Toggle button for side panel */}
-            <button
-              onClick={() => setSidePanelOpen(!sidePanelOpen)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors"
-            >
-              <svg className="h-5 w-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-sm font-medium text-slate-200">
-                {sidePanelOpen ? 'Hide' : 'Show'} Guide
-              </span>
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSidePanelOpen(!sidePanelOpen)}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors"
+              >
+                <svg className="h-5 w-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm font-medium text-slate-200">
+                  {sidePanelOpen ? 'Hide' : 'Show'} Guide
+                </span>
+              </button>
+
+              {/* Logout button */}
+              <button
+                onClick={() => signOut({ callbackUrl: '/login' })}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 border border-red-700 rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span className="text-sm font-medium text-white">Logout</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
