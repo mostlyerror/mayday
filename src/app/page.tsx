@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { COSTS } from '@/lib/constants';
+import ExportDialog from '@/components/ExportDialog';
 
 interface Lead {
   place_id: string;
@@ -57,12 +58,24 @@ export default function Home() {
   const [configError, setConfigError] = useState<string | null>(null);
   const [configSuccess, setConfigSuccess] = useState<string | null>(null);
   const [configSaving, setConfigSaving] = useState(false);
+  const [filters, setFilters] = useState<{
+    lead_type?: string;
+    status?: string;
+    max_distance?: number;
+  }>({});
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   const loadData = async () => {
     try {
+      // Build query params for leads API
+      const params = new URLSearchParams();
+      if (filters.lead_type) params.set('lead_type', filters.lead_type);
+      if (filters.status) params.set('status', filters.status);
+      if (filters.max_distance) params.set('max_distance', filters.max_distance.toString());
+
       const [statsRes, leadsRes, configRes] = await Promise.all([
         fetch('/api/stats'),
-        fetch('/api/leads'),
+        fetch(`/api/leads?${params.toString()}`),
         fetch('/api/config')
       ]);
 
@@ -193,6 +206,11 @@ export default function Home() {
     checkScanStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   const pollScanProgress = async () => {
     let attempts = 0;
@@ -691,6 +709,137 @@ export default function Home() {
         )}
       </div>
 
+      {/* Filter Controls */}
+      {leads.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+            <button
+              onClick={() => setShowExportDialog(true)}
+              className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 shadow-sm font-medium flex items-center gap-2"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export Leads
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Lead Type Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Lead Type
+              </label>
+              <select
+                value={filters.lead_type || ''}
+                onChange={(e) => setFilters({ ...filters, lead_type: e.target.value || undefined })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">All Lead Types</option>
+                <option value="fix">Fix</option>
+                <option value="build">Build</option>
+                <option value="social_only">Social Only</option>
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status
+              </label>
+              <select
+                value={filters.status || ''}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value || undefined })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">All Statuses</option>
+                <option value="up">Up</option>
+                <option value="http_4xx">HTTP 4xx</option>
+                <option value="http_5xx">HTTP 5xx</option>
+                <option value="timeout">Timeout</option>
+                <option value="ssl_expired">SSL Expired</option>
+                <option value="ssl_invalid">SSL Invalid</option>
+                <option value="connection_refused">Connection Refused</option>
+                <option value="dns_failure">DNS Failure</option>
+                <option value="hosting_expired">Hosting Expired</option>
+                <option value="parked">Parked</option>
+                <option value="redirect_social">Redirect to Social</option>
+                <option value="no_website">No Website</option>
+              </select>
+            </div>
+
+            {/* Max Distance Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Max Distance (miles)
+              </label>
+              <input
+                type="number"
+                value={filters.max_distance || ''}
+                onChange={(e) => setFilters({ ...filters, max_distance: e.target.value ? parseFloat(e.target.value) : undefined })}
+                placeholder="All distances"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                min="0"
+                step="0.1"
+              />
+            </div>
+          </div>
+
+          {/* Active Filter Badges */}
+          {(filters.lead_type || filters.status || filters.max_distance) && (
+            <div className="mt-4 flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-gray-600">Active filters:</span>
+              {filters.lead_type && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                  Lead Type: {filters.lead_type}
+                  <button
+                    onClick={() => setFilters({ ...filters, lead_type: undefined })}
+                    className="hover:bg-blue-200 rounded-full p-0.5"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
+              {filters.status && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
+                  Status: {filters.status}
+                  <button
+                    onClick={() => setFilters({ ...filters, status: undefined })}
+                    className="hover:bg-purple-200 rounded-full p-0.5"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
+              {filters.max_distance && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                  Within {filters.max_distance} mi
+                  <button
+                    onClick={() => setFilters({ ...filters, max_distance: undefined })}
+                    className="hover:bg-green-200 rounded-full p-0.5"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
+              <button
+                onClick={() => setFilters({})}
+                className="text-sm text-red-600 hover:text-red-700 font-medium"
+              >
+                Clear All
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Leads Table */}
       <div className="bg-white rounded-lg shadow overflow-x-auto">
         {leads.length === 0 ? (
@@ -1051,6 +1200,17 @@ export default function Home() {
           </p>
         </div>
       </div>
+
+      {/* Export Dialog */}
+      {showExportDialog && (
+        <ExportDialog
+          isOpen={showExportDialog}
+          onClose={() => setShowExportDialog(false)}
+          currentFilters={filters}
+          totalLeads={stats?.totalBusinesses || 0}
+          filteredLeadsCount={leads.length}
+        />
+      )}
     </div>
   );
 }
